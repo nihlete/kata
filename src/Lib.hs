@@ -5,6 +5,17 @@ where
 
 import Control.Applicative
 import Data.Bifunctor
+import Data.Char
+
+data Number = Integer Int | Floating Double
+
+data Op = Mult | Div | Add | Sub
+
+data Expr
+  = ConstExpr Number
+  | NegExpr Expr
+  | BinaryExpr Expr Op Expr
+  | ParenExpr Expr
 
 newtype Parser a = Parser {runParser :: String -> [(a, String)]}
 
@@ -25,6 +36,22 @@ instance Applicative Parser where
 instance Alternative Parser where
   empty = Parser (const [])
   a <|> b = Parser (\s -> runParser a s ++ runParser b s)
+
+parseChar :: (Char -> Bool) -> Parser Char
+parseChar pred = Parser g
+  where
+    g "" = []
+    g (c : ss)
+      | pred c = [(c, ss)]
+      | otherwise = []
+
+parseNumber :: Read a => Parser a
+parseNumber = Parser g
+  where
+    g s = do
+      let res = runParser (some (parseChar validChar)) s
+      if null res then empty else pure (first read (head res))
+    validChar c = isDigit c || (c == '.')
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
