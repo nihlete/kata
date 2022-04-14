@@ -8,14 +8,17 @@ import Data.Bifunctor
 import Data.Char
 
 data Number = Integer Int | Floating Double
+  deriving (Eq, Show)
 
 data Op = Mult | Div | Add | Sub
+  deriving (Eq, Show)
 
 data Expr
   = ConstExpr Number
   | NegExpr Expr
   | BinaryExpr Expr Op Expr
   | ParenExpr Expr
+  deriving (Eq, Show)
 
 newtype Parser a = Parser {runParser :: String -> [(a, String)]}
 
@@ -45,13 +48,28 @@ parseChar pred = Parser g
       | pred c = [(c, ss)]
       | otherwise = []
 
-parseNumber :: Read a => Parser a
-parseNumber = Parser g
+parseInt :: Parser Int
+parseInt = Parser g
   where
     g s = do
       let res = runParser (some (parseChar validChar)) s
       if null res then empty else pure (first read (head res))
     validChar c = isDigit c || (c == '.')
+
+parseDouble :: Parser Double
+parseDouble = Parser g
+  where
+    g s = do
+      let res = runParser (some (parseChar validChar)) s
+      if null res then empty else pure (first read (head res))
+    validChar c = isDigit c || (c == '.')
+
+constParser :: Parser Expr
+constParser = ConstExpr . Integer <$> parseInt <|> ConstExpr . Floating <$> parseDouble
+
+
+-- negParser :: Parser Expr
+-- negParser = parseChar (== '-') *> (NegExpr <$> exprParser)
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
