@@ -6,6 +6,7 @@ where
 import Control.Applicative
 import Data.Bifunctor
 import Data.Char
+import Text.Read (Lexeme(Number))
 
 data Number = Integer Int | Floating Double
   deriving (Eq, Show)
@@ -15,9 +16,9 @@ data Op = Mult | Div | Add | Sub
 
 data Expr
   = ConstExpr Number
-  | NegExpr Expr
   | BinaryExpr Expr Op Expr
   | ParenExpr Expr
+  | NegExpr Expr
   deriving (Eq, Show)
 
 newtype Parser a = Parser {runParser :: String -> [(a, String)]}
@@ -52,9 +53,8 @@ parseInt :: Parser Int
 parseInt = Parser g
   where
     g s = do
-      let res = runParser (some (parseChar validChar)) s
+      let res = runParser (some (parseChar isDigit)) s
       if null res then empty else pure (first read (head res))
-    validChar c = isDigit c || (c == '.')
 
 parseDouble :: Parser Double
 parseDouble = Parser g
@@ -64,9 +64,23 @@ parseDouble = Parser g
       if null res then empty else pure (first read (head res))
     validChar c = isDigit c || (c == '.')
 
-constParser :: Parser Expr
-constParser = ConstExpr . Integer <$> parseInt <|> ConstExpr . Floating <$> parseDouble
+exprParser :: Parser Expr
+exprParser = constParser <|> binaryParser <|> parenParser <|> negParser
 
+
+constParser :: Parser Number
+constParser = Parser g   where
+  g s = if length s2 < length s1 then [(Floating x2, s2)] else [(Integer x1, s1)] where
+    [(x1, s1)] = runParser parseInt s
+    [(x2, s2)] = runParser parseDouble s
+
+binaryParser = empty
+
+parenParser :: Parser Expr
+parenParser = ParenExpr <$> (parseChar (== '(') *> exprParser <* parseChar (== ')'))
+
+negParser :: Parser Expr
+negParser = NegExpr <$> (parseChar (== '-') *> exprParser)
 
 -- negParser :: Parser Expr
 -- negParser = parseChar (== '-') *> (NegExpr <$> exprParser)
