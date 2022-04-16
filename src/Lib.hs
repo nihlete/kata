@@ -38,7 +38,7 @@ instance Applicative Parser where
 
 instance Alternative Parser where
   empty = Parser (const [])
-  a <|> b = Parser (\s -> runParser a s ++ runParser b s) -- todo <|> should be determenistic choise
+  a <|> b = Parser (\s -> take 1 $ runParser a s ++ runParser b s) 
 
 parseString :: String -> Parser a -> Maybe a
 parseString s (Parser p) = case p s of
