@@ -40,6 +40,14 @@ instance Alternative Parser where
   empty = Parser (const [])
   a <|> b = Parser (\s -> runParser a s ++ runParser b s)
 
+parseString :: String -> Parser a -> Maybe a
+parseString s (Parser p) = case p s of
+  [(val, "")] -> Just val
+  _ -> Nothing
+
+skip :: (Char -> Bool) -> Parser ()
+skip p = Parser (\s -> [((), dropWhile p s)])
+
 parseChar :: (Char -> Bool) -> Parser Char
 parseChar pred = Parser g
   where
@@ -64,7 +72,7 @@ parseDouble = Parser g
     validChar c = isDigit c || (c == '.')
 
 exprParser :: Parser Expr
-exprParser = constParser <|> binaryParser <|> parenParser <|> negParser
+exprParser = constParser <|> parenParser <|> negParser <|> binaryParser
 
 constParser :: Parser Expr
 constParser = ConstExpr <$> Parser g
@@ -74,16 +82,30 @@ constParser = ConstExpr <$> Parser g
         [(x1, s1)] = runParser parseInt s
         [(x2, s2)] = runParser parseDouble s
 
-binaryParser = empty
+opParser :: Parser Op
+opParser = Parser g
+  where
+    g s = case result of
+      [('+', ss)] -> [(Add, ss)]
+      [('-', ss)] -> [(Sub, ss)]
+      [('*', ss)] -> [(Mult, ss)]
+      [('/', ss)] -> [(Div, ss)]
+      _ -> []
+      where
+        result = runParser (parseChar (== '+') <|> parseChar (== '-') <|> parseChar (== '*') <|> parseChar (== '/')) s
+
+binaryParser :: Parser Expr
+binaryParser =
+  BinaryExpr
+    <$> exprParser
+    <*> (skip (== ' ') *> opParser <* skip (== ' '))
+    <*> exprParser
 
 parenParser :: Parser Expr
 parenParser = ParenExpr <$> (parseChar (== '(') *> exprParser <* parseChar (== ')'))
 
 negParser :: Parser Expr
 negParser = NegExpr <$> (parseChar (== '-') *> exprParser)
-
--- negParser :: Parser Expr
--- negParser = parseChar (== '-') *> (NegExpr <$> exprParser)
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
