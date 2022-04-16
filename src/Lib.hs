@@ -38,7 +38,7 @@ instance Applicative Parser where
 
 instance Alternative Parser where
   empty = Parser (const [])
-  a <|> b = Parser (\s -> runParser a s ++ runParser b s)
+  a <|> b = Parser (\s -> runParser a s ++ runParser b s) -- todo <|> should be determenistic choise
 
 parseString :: String -> Parser a -> Maybe a
 parseString s (Parser p) = case p s of
@@ -77,10 +77,14 @@ exprParser = constParser <|> parenParser <|> negParser <|> binaryParser
 constParser :: Parser Expr
 constParser = ConstExpr <$> Parser g
   where
-    g s = if length s2 < length s1 then [(Floating x2, s2)] else [(Integer x1, s1)]
+    g s = helper r1 r2
       where
-        [(x1, s1)] = runParser parseInt s
-        [(x2, s2)] = runParser parseDouble s
+        r1 = runParser parseInt s
+        r2 = runParser parseDouble s
+        helper [(x, ss)] [] = [(Integer x, ss)]
+        helper [] [(x, ss)] = [(Floating x, ss)]
+        helper [(x1, s1)] [(x2, s2)] = if length s2 < length s1 then [(Floating x2, s2)] else [(Integer x1, s1)]
+        helper _ _ = []
 
 opParser :: Parser Op
 opParser = Parser g
