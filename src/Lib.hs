@@ -6,11 +6,12 @@ where
 import Control.Applicative
 import Data.Bifunctor
 import Data.Char
+import Data.List.NonEmpty (cons)
 
 data Number = Integer Int | Floating Double
   deriving (Eq, Show)
 
-data Op = Mult | Div | Add | Sub
+data Op = Mul | Div | Add | Sub
   deriving (Eq, Show)
 
 data Expr
@@ -86,36 +87,64 @@ constParser = ConstExpr <$> Parser g
         helper [(x1, s1)] [(x2, s2)] = if length s2 < length s1 then [(Floating x2, s2)] else [(Integer x1, s1)]
         helper _ _ = []
 
-opParser :: Parser Op
-opParser = Parser g
+addOpParser :: Parser Op
+addOpParser = Parser g
   where
     g s = case result of
       [('+', ss)] -> [(Add, ss)]
       [('-', ss)] -> [(Sub, ss)]
-      [('*', ss)] -> [(Mult, ss)]
+      _ -> []
+      where
+        result = runParser (charParser (== '+') <|> charParser (== '-')) s
+
+mulOpParser :: Parser Op
+mulOpParser = Parser g
+  where
+    g s = case result of
+      [('*', ss)] -> [(Mul, ss)]
       [('/', ss)] -> [(Div, ss)]
       _ -> []
       where
-        result = runParser (charParser (== '+') <|> charParser (== '-') <|> charParser (== '*') <|> charParser (== '/')) s
+        result = runParser (charParser (== '*') <|> charParser (== '/')) s
 
-binaryParser :: Parser Expr
-binaryParser =
+addParser :: Parser Expr
+addParser =
   BinaryExpr
-    <$> (negParser <|> parenParser <|> constParser)
-    <*> (skip (== ' ') *> opParser <* skip (== ' '))
-    <*> exprParser
+    <$> (mulParser <|> constParser)
+    <*> (skip (== ' ') *> addOpParser <* skip (== ' '))
+    <*> (mulParser <|> constParser)
 
-parenParser :: Parser Expr
-parenParser = ParenExpr <$> (charParser (== '(') *> exprParser <* charParser (== ')'))
+mulParser :: Parser Expr
+mulParser =
+  BinaryExpr
+    <$> constParser
+    <*> (skip (== ' ') *> mulOpParser <* skip (== ' '))
+    <*> (mulParser <|> constParser)
 
-negParser :: Parser Expr
-negParser = NegExpr <$> (charParser (== '-') *> exprParser)
+-- addParser :: Parser Expr
+-- addParser =
+--   BinaryExpr
+--     <$> (negParser <|> parenParser <|> mulParser <|> constParser)
+--     <*> (skip (== ' ') *> addOpParser <* skip (== ' '))
+--     <*> exprParser
 
-exprParser :: Parser Expr
-exprParser = negParser <|> parenParser <|> binaryParser <|> constParser
+-- mulParser :: Parser Expr
+-- mulParser =
+--   BinaryExpr
+--     <$> (negParser <|> parenParser <|> constParser <|> mulParser)
+--     <*> (skip (== ' ') *> mulOpParser <* skip (== ' '))
+--     <*> negParser <|> parenParser <|> constParser <|> addParser
 
+-- parenParser :: Parser Expr
+-- parenParser = ParenExpr <$> (charParser (== '(') *> exprParser <* charParser (== ')'))
 
--- todo: 
+-- negParser :: Parser Expr
+-- negParser = NegExpr <$> (charParser (== '-') *> exprParser)
+
+-- exprParser :: Parser Expr
+-- exprParser = negParser <|> parenParser <|> addParser <|> constParser
+
+-- todo:
 -- ghci> evaluateExpr  . fst . head $ runParser binaryParser "2 * 5 + 1 "
 -- 12.0
 evaluateExpr :: Expr -> Double
@@ -125,7 +154,7 @@ evaluateExpr (NegExpr e) = -(evaluateExpr e)
 evaluateExpr (ParenExpr e) = evaluateExpr e
 evaluateExpr (BinaryExpr a Add b) = evaluateExpr a + evaluateExpr b
 evaluateExpr (BinaryExpr a Sub b) = evaluateExpr a - evaluateExpr b
-evaluateExpr (BinaryExpr a Mult b) = evaluateExpr a * evaluateExpr b
+evaluateExpr (BinaryExpr a Mul b) = evaluateExpr a * evaluateExpr b
 evaluateExpr (BinaryExpr a Div b) = evaluateExpr a / evaluateExpr b
 
 someFunc :: IO ()
