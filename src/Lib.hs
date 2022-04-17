@@ -101,33 +101,50 @@ mulOpParser = Parser g
   where
     g s = case result of
       [('*', ss)] -> [(Mul, ss)]
+      _ -> []
+      where
+        result = runParser (charParser (== '*')) s
+
+divOpParser :: Parser Op
+divOpParser = Parser g
+  where
+    g s = case result of
       [('/', ss)] -> [(Div, ss)]
       _ -> []
       where
-        result = runParser (charParser (== '*') <|> charParser (== '/')) s
+        result = runParser (charParser (== '/')) s
 
 addParser :: Parser Expr
 addParser =
   BinaryExpr
-    <$> (mulParser <|> constParser <|> negParser <|> parenParser)
+    <$> (mulParser <|> divParser <|> constParser <|> negParser <|> parenParser)
     <*> (skip (== ' ') *> addOpParser <* skip (== ' '))
-    <*> (addParser <|> mulParser <|> constParser <|> negParser <|> parenParser)
+    <*> (divParser <|> addParser <|> mulParser <|> constParser <|> negParser <|> parenParser)
+
+-- todo: subParser
 
 mulParser :: Parser Expr
 mulParser =
   BinaryExpr
-    <$> (constParser <|> negParser <|> parenParser)
+    <$> (divParser <|> constParser <|> negParser <|> parenParser)
     <*> (skip (== ' ') *> mulOpParser <* skip (== ' '))
-    <*> (mulParser <|> constParser <|> negParser <|> parenParser)
+    <*> (divParser <|> mulParser <|> constParser <|> negParser <|> parenParser)
+
+divParser :: Parser Expr
+divParser =
+  BinaryExpr
+    <$> (constParser <|> negParser <|> parenParser)
+    <*> (skip (== ' ') *> divOpParser <* skip (== ' '))
+    <*> (constParser <|> negParser <|> parenParser)
 
 exprParser :: Parser Expr
-exprParser = addParser <|> mulParser <|> negParser <|> parenParser <|> constParser
+exprParser = addParser <|> mulParser <|> divParser <|> constParser <|> negParser <|> parenParser
 
 parenParser :: Parser Expr
 parenParser = ParenExpr <$> (charParser (== '(') *> exprParser <* charParser (== ')'))
 
 negParser :: Parser Expr
-negParser = NegExpr <$> (charParser (== '-') *> exprParser)
+negParser = NegExpr <$> (charParser (== '-') *> (constParser <|> parenParser))
 
 evaluateExpr :: Expr -> Double
 evaluateExpr (ConstExpr (Floating x)) = x
@@ -139,5 +156,20 @@ evaluateExpr (BinaryExpr a Sub b) = evaluateExpr a - evaluateExpr b
 evaluateExpr (BinaryExpr a Mul b) = evaluateExpr a * evaluateExpr b
 evaluateExpr (BinaryExpr a Div b) = evaluateExpr a / evaluateExpr b
 
+printExpr :: Expr -> String
+printExpr (ConstExpr (Floating x)) = show x
+printExpr (ConstExpr (Integer x)) = show x
+printExpr (NegExpr e) = "-" ++ printExpr e
+printExpr (ParenExpr e) = "(" ++ printExpr e ++ ")"
+printExpr (BinaryExpr a Add b) = printExpr a ++ "+" ++ printExpr b
+printExpr (BinaryExpr a Sub b) = printExpr a ++ "-" ++ printExpr b
+printExpr (BinaryExpr a Mul b) = printExpr a ++ "*" ++ printExpr b
+printExpr (BinaryExpr a Div b) = printExpr a ++ "/" ++ printExpr b
+
 calc :: String -> Double
 calc s = evaluateExpr . fst . head $ runParser exprParser s
+
+-- x = (123.45 * (678.90 / (-2.5 + 11.5) - (((80 - (19))) * 33.25)) / 20) - (123.45 * (678.90 / (-2.5 + 11.5) - (((80 - (19))) * 33.25)) / 20) + (13 - 2) / -(-11)
+
+-- "(123.45*(678.9/(-2.5+11.5)-(((80-(19)))*33.25))/20)-(123.45*(678.9/(-2.5+11.5)-(((80-(19)))*33.25))/20)+(13-2)/-(-11)"
+-- "(123.45*(678.9/(-2.5+11.5)-(((80-(19)))*33.25))/20)-(123.45*(678.9/(-2.5+11.5)-(((80-(19)))*33.25))/20)+(13-2)/-(-11)"
