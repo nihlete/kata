@@ -121,8 +121,6 @@ addParser =
     <*> (skip (== ' ') *> addOpParser <* skip (== ' '))
     <*> (divParser <|> addParser <|> mulParser <|> constParser <|> negParser <|> parenParser)
 
--- todo: subParser
-
 mulParser :: Parser Expr
 mulParser =
   BinaryExpr
@@ -168,8 +166,3 @@ printExpr (BinaryExpr a Div b) = printExpr a ++ "/" ++ printExpr b
 
 calc :: String -> Double
 calc s = evaluateExpr . fst . head $ runParser exprParser s
-
--- x = (123.45 * (678.90 / (-2.5 + 11.5) - (((80 - (19))) * 33.25)) / 20) - (123.45 * (678.90 / (-2.5 + 11.5) - (((80 - (19))) * 33.25)) / 20) + (13 - 2) / -(-11)
-
--- "(123.45*(678.9/(-2.5+11.5)-(((80-(19)))*33.25))/20)-(123.45*(678.9/(-2.5+11.5)-(((80-(19)))*33.25))/20)+(13-2)/-(-11)"
--- "(123.45*(678.9/(-2.5+11.5)-(((80-(19)))*33.25))/20)-(123.45*(678.9/(-2.5+11.5)-(((80-(19)))*33.25))/20)+(13-2)/-(-11)"
