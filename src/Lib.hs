@@ -1,11 +1,11 @@
 module Lib () where
 
 import Control.Applicative
-  ( Alternative (empty, some, (<|>)),
+  ( Alternative (empty, many, some, (<|>)),
     Applicative (liftA2),
   )
 import Data.Bifunctor (Bifunctor (first))
-import Data.Char (isDigit)
+import Data.Char (isDigit, isSpace)
 
 newtype Parser a = Parser {runParser :: String -> [(a, String)]}
 
@@ -30,7 +30,6 @@ instance Alternative Parser where
 alt :: Parser a -> Parser a -> Parser a
 a `alt` b = Parser (\s -> runParser a s ++ runParser b s)
 
--- todo possibly flatten down Number datatype into Expr
 data Number = Integer Int | Floating Double
   deriving (Eq, Show)
 
@@ -43,25 +42,32 @@ data Expr
   | NegExpr Expr
   deriving (Eq, Show)
 
-chainl1 = undefined
-
-parseExpr :: Parser Expr
-parseExpr = _ termParser op
+chainl1 :: Parser Expr -> Parser (Expr -> Expr -> Expr) -> Parser Expr
+chainl1 p pop = foldl comb <$> p <*> rest
   where
-    op =
-      AddExpr <$ charParser (== '+')
-        <|> SubExpr <$ charParser (== '-')
-        <|> MulExpr <$ charParser (== '*')
-        <|> DivExpr <$ charParser (== '/')
+    comb x (op, y) = x `op` y
+    rest = many ((,) <$> pop <*> p)
+
+exprParser :: Parser Expr
+exprParser = termParser `chainl1` addOp
 
 termParser :: Parser Expr
-termParser = undefined
+termParser = factorParser `chainl1` mulOp
+
+factorParser :: Parser Expr
+factorParser = parens exprParser <|> constParser <|> minus (parens exprParser <|> constParser <|> minus exprParser)
+
+addOp :: Parser (Expr -> Expr -> Expr)
+addOp = AddExpr <$ charParser (== '+') <|> SubExpr <$ charParser (== '-')
+
+mulOp :: Parser (Expr -> Expr -> Expr)
+mulOp = MulExpr <$ charParser (== '*') <|> DivExpr <$ charParser (== '/')
 
 parens :: Parser a -> Parser a
 parens p = charParser (== '(') *> p <* charParser (== ')')
 
-skip :: (Char -> Bool) -> Parser ()
-skip p = Parser (\s -> [((), dropWhile p s)])
+minus :: Parser Expr -> Parser Expr
+minus p = NegExpr <$> (charParser (== '-') *> p)
 
 charParser :: (Char -> Bool) -> Parser Char
 charParser pred = Parser g
@@ -98,25 +104,14 @@ constParser = ConstExpr <$> Parser g
         helper [(x1, s1)] [(x2, s2)] = if length s2 < length s1 then [(Floating x2, s2)] else [(Integer x1, s1)]
         helper _ _ = []
 
--- evaluateExpr :: Expr -> Double
--- evaluateExpr (ConstExpr (Floating x)) = x
--- evaluateExpr (ConstExpr (Integer x)) = fromIntegral x
--- evaluateExpr (NegExpr e) = -(evaluateExpr e)
--- evaluateExpr (ParenExpr e) = evaluateExpr e
--- evaluateExpr (BinaryExpr a Add b) = evaluateExpr a + evaluateExpr b
--- evaluateExpr (BinaryExpr a Sub b) = evaluateExpr a - evaluateExpr b
--- evaluateExpr (BinaryExpr a Mul b) = evaluateExpr a * evaluateExpr b
--- evaluateExpr (BinaryExpr a Div b) = evaluateExpr a / evaluateExpr b
+evaluateExpr :: Expr -> Double
+evaluateExpr (ConstExpr (Floating x)) = x
+evaluateExpr (ConstExpr (Integer x)) = fromIntegral x
+evaluateExpr (NegExpr e) = -(evaluateExpr e)
+evaluateExpr (AddExpr a b) = evaluateExpr a + evaluateExpr b
+evaluateExpr (SubExpr a b) = evaluateExpr a - evaluateExpr b
+evaluateExpr (MulExpr a b) = evaluateExpr a * evaluateExpr b
+evaluateExpr (DivExpr a b) = evaluateExpr a / evaluateExpr b
 
--- printExpr :: Expr -> String
--- printExpr (ConstExpr (Floating x)) = show x
--- printExpr (ConstExpr (Integer x)) = show x
--- printExpr (NegExpr e) = "-" ++ printExpr e
--- printExpr (ParenExpr e) = "(" ++ printExpr e ++ ")"
--- printExpr (BinaryExpr a Add b) = printExpr a ++ "+" ++ printExpr b
--- printExpr (BinaryExpr a Sub b) = printExpr a ++ "-" ++ printExpr b
--- printExpr (BinaryExpr a Mul b) = printExpr a ++ "*" ++ printExpr b
--- printExpr (BinaryExpr a Div b) = printExpr a ++ "/" ++ printExpr b
-
--- calc :: String -> Double
--- calc s = evaluateExpr . fst . head $ runParser exprParser s
+calc :: String -> Double
+calc s = evaluateExpr . fst . head $ runParser exprParser $ filter (not . isSpace) s
