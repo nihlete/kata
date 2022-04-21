@@ -115,3 +115,7 @@ evaluateExpr (DivExpr a b) = evaluateExpr a / evaluateExpr b
 
 calc :: String -> Double
 calc s = evaluateExpr . fst . head $ runParser exprParser $ filter (not . isSpace) s
+
+-- todo troublesome test
+-- Falsifiable (after 6 tests):
+--   "53.32+-12.63/(60.79)+82.4*--19.39-13.88-87.45/(31.53*(43.28)-(0.87))-(61.05*24.45)/((3.16/(92.94))+14.67-(37.33)*6.18)/(-66.13*--(76.75/((47.59)))-24.01)" expected 1636.851220403629 but got 502.23681994178486
