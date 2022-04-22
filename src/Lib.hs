@@ -55,7 +55,7 @@ termParser :: Parser Expr
 termParser = factorParser `chainl1` mulOp
 
 factorParser :: Parser Expr
-factorParser = parens exprParser <|> constParser <|> minus (parens exprParser <|> constParser <|> minus exprParser)
+factorParser = parens exprParser <|> constParser <|> minus (parens exprParser <|> constParser <|> minus factorParser)
 
 addOp :: Parser (Expr -> Expr -> Expr)
 addOp = AddExpr <$ charParser (== '+') <|> SubExpr <$ charParser (== '-')
