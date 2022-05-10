@@ -1,64 +1,24 @@
 module Lib () where
 
-import Data.Foldable (Foldable (foldl'))
+import Data.Foldable ()
+import Data.Semigroup ( Endo(Endo, appEndo))
 
-data Answer = No | Almost | Yes deriving (Show, Read, Eq, Ord)
+newtype MyMin a = MyMin {getMin :: Maybe a}
 
-isInteresting :: Integer -> [Integer] -> Answer
-isInteresting x xs
-  | x == 98 = Almost
-  | x == 99 = Almost
-  | x < 100 = No
-  | otherwise = maximum $ map (isPhrase x) (xs ++ ys) ++ [f x]
-  where
-    ys = generatePhrases (len x)
-    f x
-      | isPalindrome x || isIncreasing x || isDecreasing x = Yes
-      | isPalindrome (x + 1) || isIncreasing (x + 1) || isDecreasing (x + 1) = Almost
-      | isPalindrome (x + 2) || isIncreasing (x + 2) || isDecreasing (x + 2) = Almost
-      | otherwise = No
+instance Ord a => Semigroup (MyMin a) where
+  (MyMin Nothing) <> (MyMin Nothing) = MyMin Nothing
+  (MyMin a) <> (MyMin Nothing) = MyMin a
+  (MyMin Nothing) <> (MyMin b) = MyMin b
+  (MyMin (Just a)) <> (MyMin (Just b)) = if a < b then MyMin (Just a) else MyMin (Just b)
 
-isPhrase :: Integer -> Integer -> Answer
-isPhrase x y = case y - x of
-  0 -> Yes
-  1 -> Almost
-  2 -> Almost
-  _ -> No
+instance Ord a => Monoid (MyMin a) where
+  mempty = MyMin Nothing
 
-digs :: Integral x => x -> [x]
-digs 0 = []
-digs x = digs (x `div` 10) ++ [x `mod` 10]
+myToList :: Foldable t => t a -> [a]
+myToList = foldMap (: [])
 
-fromDigs :: [Integer] -> Integer
-fromDigs = foldl' (\x d -> x * 10 + d) 0
+myMinimum :: (Ord a, Foldable t) => t a -> Maybe a
+myMinimum = getMin . foldMap (MyMin . Just)
 
-len :: (Num p, Integral t) => t -> p
-len 0 = 0
-len x = 1 + len (x `div` 10)
-
-generatePhrases :: Integer -> [Integer]
-generatePhrases n =
-  [d * 10 ^ (n - 1) | d <- [1 .. 9]]
-    ++ [d * ones | d <- [1 .. 9]]
-    ++ [10 ^ n, 10 ^ n + 1]
-  where
-    ones = fromDigs $ replicate (fromIntegral n) 1
-
-isIncreasing :: Integer -> Bool
-isIncreasing x = helper d ds
-  where
-    (d : ds) = digs x
-    helper y [] = True
-    helper a (b : ys) = (a + 1) `mod` 10 == b && helper b ys
-
-isDecreasing :: Integer -> Bool
-isDecreasing x = helper d ds
-  where
-    (d : ds) = digs x
-    helper y [] = True
-    helper a (b : ys) = (a - 1) == b && helper b ys
-
-isPalindrome :: Integer -> Bool
-isPalindrome x = x == y
-  where
-    y = fromDigs . reverse . digs $ x
+myFoldr :: Foldable t => (a -> b -> b) -> b -> t a -> b
+myFoldr f x0 xs = appEndo (foldMap (Endo . f) xs) x0
